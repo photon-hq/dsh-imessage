@@ -1,14 +1,14 @@
 import { Service, type Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
-import type {} from '@deepseek-ai/dsh-agent-presets'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import {
-  settingsNamespace,
   SettingsConflictError,
   type SettingsDescriptor,
-  type SettingsScope,
+  type SettingsNamespace,
 } from '@deepseek-ai/dsh-settings'
+import type { Volatile } from '@deepseek-ai/cordis'
 import {
   type Domain,
   type KvTable,
@@ -21,7 +21,6 @@ import type {} from '@deepseek-ai/dsh-user-questions'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import {
   Config as ConfigSchema,
-  PluginSettingsSchema,
   resolveConfig,
   type Config,
   type PluginSettings,
@@ -94,11 +93,18 @@ export const inject = [
   'userQuestions',
 ]
 
-/** DSH non-secret settings namespace. */
-export const SETTINGS_NAMESPACE = settingsNamespace(SETTINGS_NAME)
+/** DSH non-secret settings namespace: the id of this plugin's profile entry. */
+export const SETTINGS_NAMESPACE = SETTINGS_NAME as SettingsNamespace
 
 /** Opaque Photon credential reference. */
 export const PHOTON_CREDENTIAL_REF = credentialRef(CREDENTIAL_NAME)
+
+/** Live references DSH 0.2 passes in for the schema's `volatile()` fields. */
+export interface SettingsRefs {
+  phoneNumber?: Volatile<string | undefined> | undefined
+  assignedPhoneNumber?: Volatile<string | undefined> | undefined
+  photonUserId?: Volatile<string | undefined> | undefined
+}
 
 type PluginDomain = Domain<typeof pluginDomainSpec>
 type InboundTable = KvTable<string, { receivedAt: number }>
@@ -109,7 +115,7 @@ export class DshPhotonImessageService extends TypertRemoteService {
   static Config = ConfigSchema
 
   private readonly config: ResolvedConfig
-  private settingsScope?: SettingsScope<PluginSettings>
+  private readonly settingsRefs: SettingsRefs
   private domain?: PluginDomain
   private inbound?: InboundTable
   private router?: SessionRouter
@@ -124,17 +130,21 @@ export class DshPhotonImessageService extends TypertRemoteService {
   private inboundTail = Promise.resolve()
 
   /** Construct the host service; async resources open in Service.init. */
-  constructor(ctx: Context, config: Config = {}) {
+  constructor(ctx: Context, config: Config & SettingsRefs = {}) {
     super(ctx, 'dshPhotonImessage')
     this.config = resolveConfig(config)
+    this.settingsRefs = {
+      phoneNumber: config.phoneNumber,
+      assignedPhoneNumber: config.assignedPhoneNumber,
+      photonUserId: config.photonUserId,
+    }
   }
 
   /** Register settings, open durable state, and resume local routing. */
   protected async [Service.init](): Promise<void> {
-    this.settingsScope = this.ctx.settings.register(SETTINGS_NAMESPACE, PluginSettingsSchema, {
-      applies: 'live',
-      validate: validateSettings,
-    })
+    // The plugin renders its own Settings > iMessage page; the generated form would let the
+    // phone fields be edited without provisioning the Photon line.
+    this.ctx.effect(() => this.ctx.settings.configure({ auto: false }), 'dsh-imessage.settings-page')
     const domain = await this.ctx.storageDomain.open(pluginDomainSpec)
     this.domain = domain
     this.inbound = domain.table('inbound')
@@ -317,11 +327,13 @@ export class DshPhotonImessageService extends TypertRemoteService {
           assignedPhoneNumber: user.assignedPhoneNumber,
         }
         prepared = await this.requireSpectrum().prepare(connectionConfig)
-        await this.ctx.settings.update(SETTINGS_NAMESPACE, {
+        const savedSettings = {
           phoneNumber,
           assignedPhoneNumber: user.assignedPhoneNumber,
           photonUserId: user.id,
-        }, request.expectedRevision)
+        }
+        validateSettings(savedSettings)
+        await this.ctx.settings.update(SETTINGS_NAMESPACE, savedSettings, request.expectedRevision)
         this.provisioning = {
           phase: 'ready',
           project: { id: credential.project.id, name: credential.project.name },
@@ -439,6 +451,7 @@ export class DshPhotonImessageService extends TypertRemoteService {
       // Even an authorization with no phone fields performs an empty settings
       // write so the optimistic revision is checked at the serialized write
       // boundary before the new credential becomes authoritative.
+      if (nextSettings !== undefined) validateSettings(nextSettings)
       await this.ctx.settings.update(SETTINGS_NAMESPACE, nextSettings ?? {}, expectedRevision)
     } catch (error) {
       if (prepared !== undefined) await prepared.stop().catch(() => {})
@@ -562,9 +575,15 @@ export class DshPhotonImessageService extends TypertRemoteService {
     return descriptor
   }
 
-  private requireSettings(): SettingsScope<PluginSettings> {
-    if (this.settingsScope === undefined) throw new Error('dsh-imessage settings are not initialized')
-    return this.settingsScope
+  private requireSettings(): { get(): PluginSettings } {
+    const refs = this.settingsRefs
+    return {
+      get: () => compact({
+        phoneNumber: refs.phoneNumber?.get(),
+        assignedPhoneNumber: refs.assignedPhoneNumber?.get(),
+        photonUserId: refs.photonUserId?.get(),
+      }),
+    }
   }
 
   private requireDomain(): PluginDomain {
@@ -598,6 +617,10 @@ function accountView(account: {
     email: account.email,
     ...(account.name === undefined ? {} : { name: account.name }),
   }
+}
+
+function compact(settings: Record<keyof PluginSettings, string | undefined>): PluginSettings {
+  return Object.fromEntries(Object.entries(settings).filter(([, value]) => value !== undefined)) as PluginSettings
 }
 
 function validateSettings(settings: PluginSettings): void {

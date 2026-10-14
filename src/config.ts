@@ -39,8 +39,20 @@ export interface ResolvedConfig {
   reconnectMaxMs: number
 }
 
-/** Cordis plugin config schema. */
-export const Config: s<Config> = s.object({
+/**
+ * User-editable settings fields. DSH 0.2 has no `settings.register`: the plugin entry's own
+ * Config is the settings section, and `volatile()` fields are the ones the Settings UI and
+ * `ctx.settings.update` may write live.
+ */
+export const PluginSettingsFields = {
+  phoneNumber: s.string().volatile(),
+  assignedPhoneNumber: s.string().volatile(),
+  photonUserId: s.string().volatile(),
+}
+
+/** Cordis plugin config schema: host-only options plus the volatile user settings. */
+export const Config = s.object({
+  ...PluginSettingsFields,
   photonApiOrigin: s.string().default(DEFAULT_PHOTON_API_ORIGIN),
   interactionTimeoutMs: s.number().step(1).min(1_000).default(600_000),
   maxOutboundChars: s.number().step(1).min(256).default(3_500),
@@ -86,10 +98,3 @@ export interface PluginSettings {
   /** Public Photon Spectrum user id. */
   photonUserId?: string
 }
-
-/** DSH settings schema for non-secret user configuration. */
-export const PluginSettingsSchema: s<PluginSettings> = s.object({
-  phoneNumber: s.string(),
-  assignedPhoneNumber: s.string(),
-  photonUserId: s.string(),
-})

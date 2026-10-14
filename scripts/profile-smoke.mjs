@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises'
+import { appendFile, mkdtemp, mkdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -22,6 +22,12 @@ try {
   if (typeof filename !== 'string') throw new Error('npm pack did not return a tarball filename')
   const tarball = join(packDirectory, filename)
   const env = { ...process.env, DSH_HOME: dshHome }
+
+  // DSH 0.2's pnpm refuses dependency build scripts until approved. Photon's gRPC stack needs
+  // protobufjs's postinstall, which is what a real profile approves in allowBuilds.
+  await execute(dshBinary, ['--profile', 'web', '--help'], { env })
+  const workspace = join(dshHome, 'profiles', 'web', 'pnpm-workspace.yaml')
+  await appendFile(workspace, 'allowBuilds:\n  protobufjs: true\n')
 
   await execute(dshBinary, ['plugin', '--profile', 'web', 'add', tarball], { env })
   const manifestPath = join(dshHome, 'profiles', 'web', 'package.json')

@@ -2,9 +2,9 @@
 
 `dsh-imessage` adds a [Photon](https://photon.codes)-hosted iMessage transport and a **Settings → iMessage** page to the DeepSeek Harness web profile. A user authorizes Photon with device login, saves the phone number they will send from, and receives a hosted iMessage number to text. Messages from that exact route become DSH prompts and final DSH answers are sent back over iMessage.
 
-The initial compatibility target is:
+The compatibility target is:
 
-- DeepSeek Harness `0.1.0-rc.6`
+- DeepSeek Harness `0.2.0-rc.2` (DSH `0.1.x` is no longer supported; use an earlier release of this plugin with it)
 - Spectrum `12.7.x` (the package is currently locked to `12.7.0`)
 - Node.js `22.19+` or `24+`
 
@@ -160,7 +160,7 @@ npm ci --legacy-peer-deps
 npm test
 npm run build
 npm pack --dry-run
-# With an rc.6 dsh binary available:
+# With a DSH 0.2 binary available:
 DSH_BIN=/path/to/dsh npm run test:profile
 ```
 

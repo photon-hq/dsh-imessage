@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
+
+// The setup callback installs the model selection onto a real Agent context; these tests only
+// care which preset it mounts, so replace that one export and keep the rest of dsh-agent real.
+vi.mock('@deepseek-ai/dsh-agent', async importOriginal => ({
+  ...await importOriginal<typeof import('@deepseek-ai/dsh-agent')>(),
+  installModelSelection: vi.fn(),
+}))
 import { SessionId, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
 import { SessionRouter, type ActiveSessionStore } from '../src/session-router.js'
 import type { SpectrumInboundMessage } from '../src/spectrum-runtime.js'
@@ -53,8 +60,10 @@ function fakeContext(options: FakeContextOptions = {}) {
       resume,
     },
     sessionPersistence: {
-      list: vi.fn(async () => options.stored ?? []),
-      inspect: vi.fn(),
+      list: vi.fn(async () => (options.stored ?? []).map(header => ({ header }))),
+    },
+    sessionQuery: {
+      observeSession: vi.fn(),
     },
     agentPresets: {
       defaultId: 'coding-default',
@@ -115,14 +124,16 @@ describe('DSH session lifecycle policy', () => {
       },
     ] as unknown as SessionEvent[]
     const privateRouter = instance as unknown as {
-      resumeAgent(id: ReturnType<typeof SessionId>, inspection: {
-        meta: SessionHeader
+      resumeAgent(id: ReturnType<typeof SessionId>, observation: {
+        header: SessionHeader
         events: readonly SessionEvent[]
+        projections?: { asOfSeq: never, values: { agentPreset?: string | null } }
       }): Promise<AgentHandle>
     }
     await privateRouter.resumeAgent(SessionId('stored'), {
-      meta: header('stored', { agentPreset: 'creation-preset' }),
+      header: header('stored', { agentPreset: 'creation-preset' }),
       events,
+      projections: { asOfSeq: 1 as never, values: { agentPreset: 'projected-preset' } },
     })
     const input = raw.agents.resume.mock.calls[0]?.[0]
     expect(input).toMatchObject({
@@ -130,6 +141,11 @@ describe('DSH session lifecycle policy', () => {
       agentOptions: { provider: 'saved-provider', model: 'saved-model' },
     })
     expect(typeof input?.setup).toBe('function')
+    // the projected preset, not the creation header's, is the one mounted on resume
+    // interaction handlers are covered by their own tests; here only the mounted preset matters
+    vi.spyOn(instance.interactions, 'install').mockReturnValue(() => {})
+    await input?.setup?.({} as never, {} as never)
+    expect(raw.agentPresets.mount).toHaveBeenCalledWith(expect.anything(), 'projected-preset')
   })
 
   it('lists only exact-cwd roots, excludes subagents, and coalesces live/stored duplicates', async () => {

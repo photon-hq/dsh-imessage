@@ -8,10 +8,11 @@ import {
   type ModelSelectionRef,
 } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
-import type {} from '@deepseek-ai/dsh-agent-presets'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import { createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
 import { SessionId, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
+import type { SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { chunkText } from './chunks.js'
 import { parseCommand, type ParsedCommand } from './commands.js'
 import { markdownToPlainText } from './plaintext.js'
@@ -186,7 +187,7 @@ export class SessionRouter {
   ): Promise<string | undefined> {
     const userMessage = createUserMessage({
       content: [{ type: 'text', text: prompt }],
-      source: { kind: 'plugin', plugin: PLUGIN_ID },
+      source: { kind: 'imessage', plugin: PLUGIN_ID },
     })
     const result = this.turns.begin(agent, userMessage.id, channel)
     try {
@@ -378,12 +379,13 @@ export class SessionRouter {
       return live
     }
 
-    const inspection = await this.ctx.sessionPersistence.inspect(id)
-    if (!this.isVisibleHeader(inspection.meta)) {
+    // The observation is a Disposable read lease; hold it only while resuming.
+    using observation = await this.ctx.sessionQuery.observeSession(id)
+    if (!this.isVisibleHeader(observation.header)) {
       throw new PluginError('runtime-failed', 'The selected session is not a root session in this workspace.')
     }
     try {
-      const handle = await this.resumeAgent(id, inspection)
+      const handle = await this.resumeAgent(id, observation)
       this.ownedHandle = handle
       return handle.agent
     } catch (error) {
@@ -421,10 +423,10 @@ export class SessionRouter {
 
   private async resumeAgent(
     id: ReturnType<typeof SessionId>,
-    inspection: { meta: SessionHeader; events: readonly SessionEvent[] },
+    observation: Pick<SessionObservation, 'header' | 'events' | 'projections'>,
   ): Promise<AgentHandle> {
-    const presetId = presetForResume(inspection.meta, inspection.events)
-    const selection = selectionForResume(inspection.events, this.ctx.agentDefaultModel.currentSelection())
+    const presetId = presetForResume(observation)
+    const selection = selectionForResume(observation.events, this.ctx.agentDefaultModel.currentSelection())
     let disposeBinding: (() => void) | undefined
     const handle = await this.ctx.agents.resume({
       resumeSessionId: id,
@@ -475,7 +477,7 @@ export class SessionRouter {
         active: agent.id === active,
       })
     }
-    for (const header of await this.ctx.sessionPersistence.list()) {
+    for (const { header } of await this.ctx.sessionPersistence.list()) {
       if (!this.isVisibleHeader(header)) continue
       const existing = rows.get(header.id)
       rows.set(header.id, existing ?? {

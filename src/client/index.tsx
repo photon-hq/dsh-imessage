@@ -1,5 +1,6 @@
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
-// These type-only imports merge the settings slot and generated Remote faces.
+import type { Context } from '@deepseek-ai/cordis'
+// These type-only imports merge the slot registry, settings slot and generated Remote faces.
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import { TYPERT_REMOTE } from 'dsh-imessage/remote'
@@ -22,7 +23,7 @@ export type {
 } from './ImessageSettingsSection.js'
 
 /** Mount the generated RPC contribution and register Settings > iMessage. */
-export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
+export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const unmountRemote = await ctx.remote.$mount(TYPERT_REMOTE)
   const settingsFiber = ctx.inject(settingsInject, (readyCtx) => {
     const controller = new ImessageSettingsController(readyCtx.remote.dshPhotonImessage)
