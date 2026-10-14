@@ -31,15 +31,12 @@ jobs:
       - run: npm run build
       - run: npm run audit:prod
       - run: npm pack --dry-run --ignore-scripts
-      # dsh@rc.6 currently resolves dsh-app-boot@rc.7 through its own caret.
-      # Those two boot dependencies are peer-only there, so name them explicitly
-      # in the disposable CLI used solely for packed-profile validation.
-      - name: Install isolated DSH rc.6 smoke CLI
+      # A plain install (no --legacy-peer-deps) lets dsh resolve its own peer dependencies; with
+      # them skipped, dsh boots but most of its plugins fail to import.
+      - name: Install isolated DSH 0.2 smoke CLI
         run: >-
-          npm install --prefix "$RUNNER_TEMP/dsh-rc6"
-          @deepseek-ai/dsh@0.1.0-rc.6
-          @deepseek-ai/cordis-plugin-group@^1.0.1
-          @deepseek-ai/dsh-invariants@^0.1.0-rc.6
-          --legacy-peer-deps --ignore-scripts
+          npm install --prefix "$RUNNER_TEMP/dsh-02"
+          @deepseek-ai/dsh@0.2.0-rc.2
+          --ignore-scripts
       - name: Install packed plugin into a disposable web profile
-        run: DSH_BIN="$RUNNER_TEMP/dsh-rc6/node_modules/.bin/dsh" npm run test:profile
+        run: DSH_BIN="$RUNNER_TEMP/dsh-02/node_modules/.bin/dsh" npm run test:profile

@@ -246,3 +246,13 @@ export interface MutationFailure {
 
 /** Result of a settings-page mutation. */
 export type MutationResult = MutationSuccess | MutationFailure
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    /** A prompt delivered over iMessage by this plugin. */
+    imessage: {
+      kind: 'imessage'
+      plugin: string
+    }
+  }
+}

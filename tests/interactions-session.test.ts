@@ -66,17 +66,33 @@ describe('iMessage commands and interactions', () => {
     expect(selectionForResume([], fallback)).toBe(fallback)
   })
 
-  it('resumes with the latest logged preset selection over the creation header', () => {
-    const events = [
-      { type: 'agent-preset/selected', seq: 0, time: 1, data: { agentPreset: 'minimal' } },
-      { type: 'agent-preset/selected', seq: 1, time: 2, data: { agentPreset: 'coding' } },
-    ] as unknown as SessionEvent[]
-    expect(presetForResume({
+  describe('preset reconstruction (DSH 0.2 reads the agentPreset projection)', () => {
+    const header = {
       version: 0,
       id: 'session' as never,
       createdAt: 0,
       delegationDepth: 0,
       agentPreset: 'original',
-    }, events)).toBe('coding')
+    }
+
+    it('prefers the projected preset, which already folds later selections over the creation header', () => {
+      expect(presetForResume({
+        header,
+        events: [],
+        projections: { asOfSeq: 1 as never, values: { agentPreset: 'coding' } },
+      })).toBe('coding')
+    })
+
+    it('falls back to the creation header when the host did not project', () => {
+      expect(presetForResume({ header, events: [] })).toBe('original')
+    })
+
+    it('falls back to the creation header when the projection holds no preset', () => {
+      expect(presetForResume({
+        header,
+        events: [],
+        projections: { asOfSeq: 0 as never, values: { agentPreset: null } },
+      })).toBe('original')
+    })
   })
 })
