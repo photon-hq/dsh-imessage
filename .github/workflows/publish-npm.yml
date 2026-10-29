@@ -35,7 +35,6 @@ jobs:
       use-oidc: true
       release: ${{ github.event_name == 'workflow_dispatch' && inputs.release || false }}
       dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs['dry-run'] || false }}
-      notify-on-release: false
     # Inherit the Photon organization OPENAI_API_KEY. npm publishing remains
     # tokenless through the caller workflow's existing Trusted Publisher entry.
     secrets: inherit
