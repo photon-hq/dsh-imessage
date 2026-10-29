@@ -96,9 +96,9 @@
     "@elysiajs/eden": "1.4.9",
     "@spectrum-ts/core": "12.7.0",
     "@spectrum-ts/imessage": "12.7.0",
-    "better-auth": "1.6.30",
-    "elysia": "1.4.28",
-    "zod": "^4.4.3"
+    "better-auth": "1.7.14",
+    "elysia": "1.4.30",
+    "zod": "^4.6.7"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
@@ -165,6 +165,6 @@
     "react-dom": "^18.3.1",
     "tsdown": "^0.16.5",
     "typescript": "6.0.3",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.12"
   }
 }
