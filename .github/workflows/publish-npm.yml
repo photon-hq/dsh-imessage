@@ -5,36 +5,49 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      release:
-        type: boolean
-        description: Force a release without a merged PR carrying the release label
-        default: false
-      dry-run:
-        type: boolean
-        description: Skip npm publication; forced version bump and GitHub release still occur
-        default: false
+      operation:
+        description: Verify and pack, publish staging, or promote a stored candidate
+        type: choice
+        options: [dry-run, stage, promote]
+        default: dry-run
+      staging-version:
+        description: Staging version to promote; blank selects the current staging tag
+        type: string
+        default: ""
 
 jobs:
-  release:
-    # BuildSpace v1 predates npm OIDC support. Use the current Photon workflow
-    # until that support is included in a new immutable BuildSpace release tag.
-    uses: photon-hq/buildspace/.github/workflows/typescript-service-release.yaml@main
+  stage:
+    if: github.event_name == 'push' || inputs.operation == 'dry-run' || inputs.operation == 'stage'
+    uses: photon-hq/buildspace/.github/workflows/package-stage.yml@c1fb06e4ae457a8e053642a914bd37b8f5ce9e1b
     permissions:
       contents: write
       pull-requests: read
       id-token: write
-      # GitHub validates every called-workflow job permission up front, even
-      # though GitHub Packages publishing remains disabled for this package.
       packages: write
+      actions: read
+      attestations: write
     with:
-      service-name: dsh-imessage
-      bun-version: "1.3"
-      npm-tag: latest
-      build-command: npm run check
-      publish-command: npm publish --ignore-scripts
-      use-oidc: true
-      release: ${{ github.event_name == 'workflow_dispatch' && inputs.release || false }}
-      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs['dry-run'] || false }}
-    # Inherit the Photon organization OPENAI_API_KEY. npm publishing remains
-    # tokenless through the caller workflow's existing Trusted Publisher entry.
-    secrets: inherit
+      package: dsh-imessage
+      registry: https://registry.npmjs.org
+      environment: staging
+      setup-pnpm: false
+      install: npm ci --legacy-peer-deps --ignore-scripts
+      ci-workflow: ci.yml
+      verify: npm run check
+      pack: node scripts/pack-release.mjs
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'dry-run' }}
+
+  promote:
+    if: github.event_name == 'workflow_dispatch' && inputs.operation == 'promote' && github.ref == 'refs/heads/main'
+    uses: photon-hq/buildspace/.github/workflows/package-promote.yml@c1fb06e4ae457a8e053642a914bd37b8f5ce9e1b
+    permissions:
+      contents: write
+      packages: write
+      actions: read
+      attestations: read
+      id-token: write
+    with:
+      package: dsh-imessage
+      registry: https://registry.npmjs.org
+      environment: production
+      staging-version: ${{ inputs.staging-version }}
