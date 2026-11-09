@@ -18,7 +18,7 @@ on:
 jobs:
   stage:
     if: github.event_name == 'push' || inputs.operation == 'dry-run' || inputs.operation == 'stage'
-    uses: photon-hq/buildspace/.github/workflows/package-stage.yml@c1fb06e4ae457a8e053642a914bd37b8f5ce9e1b
+    uses: photon-hq/buildspace/.github/workflows/package-stage.yml@913e9cef8e8bd00775b28ac3e2a759ccfc796eea
     permissions:
       contents: write
       pull-requests: read
@@ -39,7 +39,7 @@ jobs:
 
   promote:
     if: github.event_name == 'workflow_dispatch' && inputs.operation == 'promote' && github.ref == 'refs/heads/main'
-    uses: photon-hq/buildspace/.github/workflows/package-promote.yml@c1fb06e4ae457a8e053642a914bd37b8f5ce9e1b
+    uses: photon-hq/buildspace/.github/workflows/package-promote.yml@913e9cef8e8bd00775b28ac3e2a759ccfc796eea
     permissions:
       contents: write
       packages: write

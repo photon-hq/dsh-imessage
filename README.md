@@ -168,7 +168,7 @@ The test suite covers device-flow backoff/cancellation, secret redaction, projec
 
 ## Releasing
 
-Every push to `main` runs the [release workflow](https://github.com/photon-hq/dsh-imessage/actions/workflows/publish-npm.yml) to verify and publish a staging candidate through the pinned [Buildspace package workflows](https://github.com/photon-hq/buildspace/tree/c1fb06e4ae457a8e053642a914bd37b8f5ce9e1b/.github/workflows). Staging does not move npm's stable `latest` tag.
+Every push to `main` runs the [release workflow](https://github.com/photon-hq/dsh-imessage/actions/workflows/publish-npm.yml) to verify and publish a staging candidate through the pinned [Buildspace package workflows](https://github.com/photon-hq/buildspace/tree/913e9cef8e8bd00775b28ac3e2a759ccfc796eea/.github/workflows). Staging does not move npm's stable `latest` tag.
 
 Manual dispatch defaults to `dry-run`, which verifies and packs without publishing or creating tags or Releases. To release, dispatch `promote` from `main` with the staging version and obtain approval in the `production` environment. Promotion verifies and publishes the stored candidate under npm's stable `latest` tag without rebuilding or committing a source version bump.
 
