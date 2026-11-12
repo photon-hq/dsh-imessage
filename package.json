@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "description": "Photon-hosted iMessage transport and configuration UI for DeepSeek Harness",
   "type": "module",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/photon-hq/dsh-imessage.git"
