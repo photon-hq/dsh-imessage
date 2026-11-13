@@ -168,30 +168,15 @@ The test suite covers device-flow backoff/cancellation, secret redaction, projec
 
 ## Releasing
 
-The [release workflow](https://github.com/photon-hq/dsh-imessage/actions/workflows/publish-npm.yml) delegates to BuildSpace's single-package TypeScript pipeline. To release, add the `release` label to a pull request before merging it into `main`. BuildSpace then determines the semantic version, generates release notes, commits the version bump, creates the GitHub Release, runs the full package check, and publishes to npm's stable `latest` channel with provenance.
+Every push to `main` runs the [release workflow](https://github.com/photon-hq/dsh-imessage/actions/workflows/publish-npm.yml) to verify and publish a staging candidate through the pinned [Buildspace package workflows](https://github.com/photon-hq/buildspace/tree/913e9cef8e8bd00775b28ac3e2a759ccfc796eea/.github/workflows). Staging does not move npm's stable `latest` tag.
 
-For a prerelease, apply both `release` and `prerelease`; BuildSpace publishes that version to its prerelease channel instead. Unlabeled merges run normal CI but do not release. A manual dispatch can force a release for recovery. BuildSpace's `dry-run` skips npm publication only; when combined with a forced release it still creates the version commit and GitHub Release, so pull-request CI is the safe validation path.
+Manual dispatch defaults to `dry-run`, which verifies and packs without publishing or creating tags or Releases. To release, dispatch `promote` from `main` with the staging version and obtain approval in the `production` environment. Promotion verifies and publishes the stored candidate under npm's stable `latest` tag without rebuilding or committing a source version bump.
 
-The workflow uses npm Trusted Publishing through GitHub OIDC. Do not add a long-lived `NPM_TOKEN` solely for releases. It intentionally calls BuildSpace `main` because the immutable `v1` workflow predates OIDC support; move to the next immutable BuildSpace tag once it contains `use-oidc`.
+The pack script stamps a temporary package copy and checks that its archive contains every declared export, entry point, and type declaration without changing the source manifest or lockfile.
 
-`dsh-imessage` was bootstrapped once at `0.1.0-alpha.1`, then configured through the npm CLI with these exact Trusted Publisher values:
+Before the first npm publication, an npm administrator must [configure trusted publishing](https://docs.npmjs.com/trusted-publishers/) for `photon-hq/dsh-imessage`, caller workflow `publish-npm.yml`, and two environment-specific entries: `staging` and `production`, each allowing `npm publish` and `npm dist-tag`. Publishing uses GitHub OIDC; these workflows do not use `NPM_TOKEN`. Keep any legacy token until the first real promotion succeeds and no active legacy consumer or documented rollback needs it.
 
-| Field | Value |
-|---|---|
-| Provider | GitHub Actions |
-| Organization | `photon-hq` |
-| Repository | `dsh-imessage` |
-| Workflow filename | `publish-npm.yml` |
-| Environment | blank |
-| Allowed action | `npm publish` |
-
-The configuration can be inspected through the npm CLI:
-
-```sh
-npx --yes npm@11.19.0 trust list dsh-imessage
-```
-
-OIDC publishing was verified with the alpha releases, including npm's SLSA provenance attestation. The package's publishing access is set to **Require two-factor authentication and disallow tokens**, and the temporary bootstrap CLI session was logged out afterward.
+The first staging run can create `staging` automatically. Before the first production promotion, a repository administrator must run the [Buildspace environment setup command](https://github.com/photon-hq/buildspace/blob/main/README.md#package-stage-and-promote). The command restricts both environments to `main` and requires at least one production reviewer, using CODEOWNERS by default; append `@USER` or `@ORG/TEAM` after the repository argument if CODEOWNERS supplies no reviewers. [Required reviewers in private repositories need GitHub Enterprise](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
 
 Before a compatibility-target promotion, run a Photon staging smoke test with a real hosted line: authorize, create/reuse `dsh`, provision/reuse a sender, send an inbound prompt, answer an approval and question, exercise `/new`, `/sessions`, `/switch`, stop/restart DSH, confirm replay deduplication, reauthorize after token expiry, and disconnect while verifying the Photon project/users remain.
 
